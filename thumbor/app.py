@@ -28,6 +28,7 @@ class ThumborServiceApp(tornado.web.Application):
     def get_handlers(self):
         handlers = [
             (r'/healthcheck', HealthcheckHandler),
+            (r'/tester', HealthcheckHandler),
         ]
 
         if self.context.config.UPLOAD_ENABLED:
