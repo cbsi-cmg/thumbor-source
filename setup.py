@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from setuptools import setup, Extension
 from thumbor import __version__
@@ -18,7 +18,6 @@ import logging
 
 tests_require = [
     "redis>=2.4.9,<3.0.0",
-    "tornado-pyvows>=0.6.0",
     "coverage",
     "mock>=1.0.1,<3.0.0",
     "raven",
@@ -31,7 +30,7 @@ tests_require = [
     "yanc",
     "remotecv",
     "pyssim",
-    "cairosvg",
+    "cairosvg!=1.0.21",
     "preggy>=1.3.0",
 ]
 
@@ -73,7 +72,7 @@ http://<thumbor-server>/300x200/smart/s.glbimg.com/et/bb/f/original/2011/03/24/V
 """,
         keywords='imaging face detection feature thumbnail imagemagick pil opencv',
         author='globo.com',
-        author_email='timehome@corp.globo.com',
+        author_email='thumbor@googlegroups.com',
         url='https://github.com/thumbor/thumbor/wiki',
         license='MIT',
         classifiers=[
@@ -102,7 +101,7 @@ http://<thumbor-server>/300x200/smart/s.glbimg.com/et/bb/f/original/2011/03/24/V
             "derpconf>=0.2.0",
             "pexif>=0.15,<1.0",
             "statsd>=3.0.1",
-            "libthumbor",
+            "libthumbor>=1.3.2",
             "futures",
             "argparse",
             "pytz",
@@ -122,6 +121,7 @@ http://<thumbor-server>/300x200/smart/s.glbimg.com/et/bb/f/original/2011/03/24/V
 
         ext_modules=extension_modules
     )
+
 
 try:
     run_setup(gather_filter_extensions())

@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from thumbor.point import FocalPoint as fp
 from thumbor.context import Context, RequestParameters
@@ -240,6 +240,7 @@ class TestData(object):
         assert self.engine.calls['crop'][0]['bottom'] == self.crop_bottom, self.crop_error_message
 
         return True
+
 
 TESTITEMS = [
     TestData(

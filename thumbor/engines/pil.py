@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 import warnings
 import os
@@ -16,9 +16,14 @@ from io import BytesIO
 
 from PIL import Image, ImageFile, ImageDraw, ImageSequence, JpegImagePlugin
 
+try:
+    from cv2 import cv
+except:
+    cv = None
+
 from thumbor.engines import BaseEngine
 from thumbor.engines.extensions.pil import GifWriter
-from thumbor.utils import logger, deprecated
+from thumbor.utils import logger, deprecated, EXTENSION
 
 try:
     from thumbor.ext.filters import _composite
@@ -37,13 +42,13 @@ FORMATS = {
 }
 
 ImageFile.MAXBLOCK = 2 ** 25
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 if hasattr(ImageFile, 'IGNORE_DECODING_ERRORS'):
     ImageFile.IGNORE_DECODING_ERRORS = True
 
 
 class Engine(BaseEngine):
-
     def __init__(self, context):
         super(Engine, self).__init__(context)
         self.subsampling = None
@@ -85,6 +90,22 @@ class Engine(BaseEngine):
 
         return img
 
+    def get_resize_filter(self):
+        config = self.context.config
+        resample = config.PILLOW_RESAMPLING_FILTER if config.PILLOW_RESAMPLING_FILTER is not None else 'LANCZOS'
+
+        available = {
+            'LANCZOS': Image.LANCZOS,
+            'NEAREST': Image.NEAREST,
+            'BILINEAR': Image.BILINEAR,
+            'BICUBIC': Image.BICUBIC,
+        }
+
+        if hasattr(Image, 'HAMMING'):
+            available['HAMMING'] = Image.HAMMING
+
+        return available.get(resample.upper(), Image.LANCZOS)
+
     def draw_rectangle(self, x, y, width, height):
         # Nasty retry if the image is loaded for the first time and it's truncated
         try:
@@ -96,10 +117,15 @@ class Engine(BaseEngine):
         del d
 
     def resize(self, width, height):
+        mode = self.image.mode
         if self.image.mode == 'P':
             logger.debug('converting image from 8-bit palette to 32-bit RGBA for resize')
-            self.image = self.image.convert('RGBA')
-        self.image = self.image.resize((int(width), int(height)), Image.ANTIALIAS)
+            mode = 'RGBA'
+
+        resample = self.get_resize_filter()
+
+        self.image.draft(mode, (int(width), int(height)))
+        self.image = self.image.resize((int(width), int(height)), resample)
 
     def crop(self, left, top, right, bottom):
         self.image = self.image.crop((
@@ -196,16 +222,10 @@ class Engine(BaseEngine):
 
             if ext in ['.png', '.gif'] and self.image.mode == 'CMYK':
                 self.image = self.image.convert('RGBA')
-            self.image.format = FORMATS[ext]
-            self.image.save(img_buffer, FORMATS[ext], **options)
+            self.image.format = FORMATS.get(ext, FORMATS[self.get_default_extension()])
+            self.image.save(img_buffer, self.image.format, **options)
         except IOError:
             logger.exception('Could not save as improved image, consider to increase ImageFile.MAXBLOCK')
-            self.image.save(img_buffer, FORMATS[ext])
-        except KeyError:
-            logger.exception('Image format not found in PIL: %s' % ext)
-            ext = self.get_default_extension()
-            # extension could not help determine format => use default
-            self.image.format = FORMATS[ext]
             self.image.save(img_buffer, FORMATS[ext])
 
         results = img_buffer.getvalue()
@@ -259,6 +279,37 @@ class Engine(BaseEngine):
         os.remove(tmp_file_path)
 
         return results
+
+    def convert_tif_to_png(self, buffer):
+        if not cv:
+            msg = """[PILEngine] convert_tif_to_png failed: opencv not imported"""
+            logger.error(msg)
+            return buffer
+
+        # can not use cv2 here, because ubuntu precise shipped with python-opencv 2.3 which has bug with imencode
+        # requires 3rd parameter buf which could not be created in python. Could be replaced with these lines:
+        # img = cv2.imdecode(numpy.fromstring(buffer, dtype='uint16'), -1)
+        # buffer = cv2.imencode('.png', img)[1].tostring()
+        mat_data = cv.CreateMatHeader(1, len(buffer), cv.CV_8UC1)
+        cv.SetData(mat_data, buffer, len(buffer))
+        img = cv.DecodeImage(mat_data, -1)
+        buffer = cv.EncodeImage(".png", img).tostring()
+
+        mime = self.get_mimetype(buffer)
+        self.extension = EXTENSION.get(mime, '.jpg')
+        return buffer
+
+    def load(self, buffer, extension):
+        self.extension = extension
+
+        if extension is None:
+            mime = self.get_mimetype(buffer)
+            self.extension = EXTENSION.get(mime, '.jpg')
+
+        if self.extension == '.tif':  # Pillow does not support 16bit per channel TIFF images
+            buffer = self.convert_tif_to_png(buffer)
+
+        super(Engine, self).load(buffer, self.extension)
 
     @deprecated("Use image_data_as_rgb instead.")
     def get_image_data(self):

@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from os.path import expanduser, join
 import tempfile
@@ -46,6 +46,10 @@ Config.define('PILLOW_JPEG_QTABLES', None,
               'Specify quantization tables for Pillow (see `qtables` \
               in http://pillow.readthedocs.org/en/latest/handbook/image-file-formats.html#jpeg). '
               'Will ignore `quality`. Using `keep` will copy the original file\'s qtables.', 'Imaging')
+
+Config.define('PILLOW_RESAMPLING_FILTER', 'LANCZOS',
+              'Specify resampling filter for Pillow resize method.'
+              'One of LANCZOS, NEAREST, BILINEAR, BICUBIC, HAMMING (Pillow>=3.4.0).', 'Imaging')
 
 Config.define('WEBP_QUALITY', None, 'Quality index used for generated WebP images. If not set (None) the same level of '
               'JPEG quality will be used.', 'Imaging')
@@ -302,6 +306,7 @@ Config.define(
         'thumbor.filters.saturation',
         'thumbor.filters.max_age',
         'thumbor.filters.curve',
+        'thumbor.filters.distributed_collage',
     ],
     'List of filters that thumbor will allow to be used in generated images. All of them must be ' +
     'full names of python modules (python must be able to import it)', 'Filters')
@@ -349,7 +354,7 @@ Config.define('ERROR_FILE_NAME_USE_CONTEXT', False, 'File of error log name is p
 
 # SIGNER MODULE
 Config.define(
-    'URL_SIGNER', 'thumbor.url_signers.base64_hmac_sha1',
+    'URL_SIGNER', 'libthumbor.url_signers.base64_hmac_sha1',
     'The url signer thumbor should use to verify url signatures.' +
     'This must be the full name of a python module ' +
     '(python must be able to import it)', 'Extensibility'
@@ -375,6 +380,7 @@ def format_value(value):
         representation += '#]'
         return representation
     return value
+
 
 if __name__ == '__main__':
     generate_config()

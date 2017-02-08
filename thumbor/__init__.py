@@ -6,9 +6,9 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 '''This is the main module in thumbor'''
 
-__version__ = "6.1.5"
-__release_date__ = "18-Aug-2016"
+__version__ = "6.2.0"
+__release_date__ = "18-Nov-2016"

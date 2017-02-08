@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 import sys
 import optparse
@@ -180,6 +180,7 @@ def main(arguments=None):
     sys.stdout.write('%s\n' % url)
 
     return url
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])

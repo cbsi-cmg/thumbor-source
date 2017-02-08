@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 import datetime
 import re
@@ -85,6 +85,7 @@ def return_contents(response, url, callback, context, req_start=None):
                 context.metrics.timing('original_image.time_info.' + x, response.time_info[x] * 1000)
             context.metrics.timing('original_image.time_info.bytes_per_second', len(response.body) / response.time_info['total'])
         result.buffer = response.body
+        context.metrics.incr('original_image.response_bytes', len(response.body))
 
     callback(result)
 

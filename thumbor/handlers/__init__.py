@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 import sys
 import functools
@@ -378,9 +378,7 @@ class BaseHandler(tornado.web.RequestHandler):
         self.set_header('Server', 'Thumbor/%s' % __version__)
         self.set_header('Content-Type', content_type)
 
-        if context.config.AUTO_WEBP and \
-                not context.request.engine.is_multiple() and \
-                context.request.engine.can_convert_to_webp():
+        if self.is_webp(self.context):
             self.set_header('Vary', 'Accept')
 
         context.headers = self._headers.copy()
@@ -538,15 +536,12 @@ class BaseHandler(tornado.web.RequestHandler):
         if mime is None:
             mime = BaseEngine.get_mimetype(fetch_result.buffer)
 
-        self.context.request.extension = EXTENSION.get(mime, '.jpg')
+        self.context.request.extension = extension = EXTENSION.get(mime, '.jpg')
 
         original_preserve = self.context.config.PRESERVE_EXIF_INFO
         self.context.config.PRESERVE_EXIF_INFO = True
 
         try:
-            mime = BaseEngine.get_mimetype(fetch_result.buffer)
-            self.context.request.extension = extension = EXTENSION.get(mime, None)
-
             if mime == 'image/gif' and self.context.config.USE_GIFSICLE_ENGINE:
                 self.context.request.engine = self.context.modules.gif_engine
             else:

@@ -6,7 +6,7 @@
 
 # Licensed under the MIT license:
 # http://www.opensource.org/licenses/mit-license
-# Copyright (c) 2011 globo.com timehome@corp.globo.com
+# Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from unittest import TestCase
 import mock
@@ -208,6 +208,7 @@ class ServerTestCase(TestCase):
         server_parameters = mock.Mock(
             config_path='./tests/fixtures/thumbor_config_server_test.conf',
             log_level='DEBUG',
+            debug=False,
             security_key='sec',
             app_class='thumbor.app.ThumborServiceApp',
             fd=None,
@@ -233,6 +234,7 @@ class ServerTestCase(TestCase):
             config_path='./tests/fixtures/thumbor_config_server_test.conf',
             log_level='DEBUG',
             security_key='sec',
+            debug=False,
             app_class='thumbor.app.ThumborServiceApp',
             fd=None,
             ip='0.0.0.0',
