@@ -9,6 +9,7 @@
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from pexif import ExifSegment
+from xml.etree.ElementTree import ParseError
 
 try:
     import cairosvg
@@ -27,7 +28,7 @@ from thumbor.utils import logger, EXTENSION
 
 WEBP_SIDE_LIMIT = 16383
 
-SVG_RE = re.compile(r'<svg\s[^>]*(["\'])http://www.w3.org/2000/svg\1', re.I)
+SVG_RE = re.compile(r'<svg\s[^>]*([\"\'])http[^\"\']*svg[^\"\']*', re.I)
 
 
 class EngineResult(object):
@@ -100,28 +101,24 @@ class BaseEngine(object):
 
     @classmethod
     def get_mimetype(cls, buffer):
-        mime = None
-
-        # magic number detection
         if buffer.startswith('GIF8'):
-            mime = 'image/gif'
+            return 'image/gif'
         elif buffer.startswith('\x89PNG\r\n\x1a\n'):
-            mime = 'image/png'
+            return 'image/png'
         elif buffer.startswith('\xff\xd8'):
-            mime = 'image/jpeg'
+            return 'image/jpeg'
         elif buffer.startswith('WEBP', 8):
-            mime = 'image/webp'
+            return 'image/webp'
         elif buffer.startswith('\x00\x00\x00\x0c'):
-            mime = 'image/jp2'
+            return 'image/jp2'
         elif buffer.startswith('\x00\x00\x00 ftyp'):
-            mime = 'video/mp4'
+            return 'video/mp4'
         elif buffer.startswith('\x1aE\xdf\xa3'):
-            mime = 'video/webm'
+            return 'video/webm'
         elif buffer.startswith('\x49\x49\x2A\x00') or buffer.startswith('\x4D\x4D\x00\x2A'):
-            mime = 'image/tiff'
-        elif SVG_RE.search(buffer[:1024].replace(b'\0', '')):
-            mime = 'image/svg+xml'
-        return mime
+            return 'image/tiff'
+        elif SVG_RE.search(buffer[:2048].replace(b'\0', '')):
+            return 'image/svg+xml'
 
     def wrap(self, multiple_engine):
         for method_name in ['resize', 'crop', 'flip_vertically',
@@ -144,9 +141,17 @@ class BaseEngine(object):
             logger.error(msg)
             return buffer
 
-        buffer = cairosvg.svg2png(bytestring=buffer, dpi=self.context.config.SVG_DPI)
-        mime = self.get_mimetype(buffer)
-        self.extension = EXTENSION.get(mime, '.jpg')
+        try:
+            buffer = cairosvg.svg2png(bytestring=buffer, dpi=self.context.config.SVG_DPI)
+            mime = self.get_mimetype(buffer)
+            self.extension = EXTENSION.get(mime, '.jpg')
+        except ParseError:
+            mime = self.get_mimetype(buffer)
+            extension = EXTENSION.get(mime)
+            if extension is None or extension == '.svg':
+                raise
+            self.extension = extension
+
         return buffer
 
     def load(self, buffer, extension):
@@ -227,6 +232,9 @@ class BaseEngine(object):
         return round(float(new_width) * height / width, 0)
 
     def _get_exif_segment(self):
+        if (not hasattr(self, 'exif')) or self.exif is None:
+            return None
+
         try:
             segment = ExifSegment(None, None, self.exif, 'ro')
         except Exception:
@@ -243,9 +251,6 @@ class BaseEngine(object):
         :return: Orientation value (1 - 8)
         :rtype: int or None
         """
-        if (not hasattr(self, 'exif')) or self.exif is None:
-            return None
-
         segment = self._get_exif_segment()
         if segment:
             orientation = segment.primary['Orientation']
@@ -262,6 +267,9 @@ class BaseEngine(object):
         :type override_exif: Boolean
         """
         orientation = self.get_orientation()
+
+        if orientation is None:
+            return
 
         if orientation == 2:
             self.flip_horizontally()

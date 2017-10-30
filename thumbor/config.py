@@ -53,6 +53,8 @@ Config.define('PILLOW_RESAMPLING_FILTER', 'LANCZOS',
 
 Config.define('WEBP_QUALITY', None, 'Quality index used for generated WebP images. If not set (None) the same level of '
               'JPEG quality will be used.', 'Imaging')
+
+Config.define('PNG_COMPRESSION_LEVEL', 6, 'Compression level for generated PNG images.', 'Imaging')
 Config.define('AUTO_WEBP', False, 'Specifies whether WebP format should be used automatically if the request accepts it '
               '(via Accept header)', 'Imaging')
 Config.define('SVG_DPI', 150,
@@ -175,6 +177,9 @@ Config.define(
 Config.define(
     'HTTP_LOADER_CA_CERTS', None,
     'The filename of CA certificates in PEM format', 'HTTP Loader')
+Config.define(
+    'HTTP_LOADER_VALIDATE_CERTS', None,
+    'Validate the server’s certificate for HTTPS requests', 'HTTP Loader')
 Config.define(
     'HTTP_LOADER_CLIENT_KEY', None,
     'The filename for client SSL key', 'HTTP Loader')
@@ -307,6 +312,7 @@ Config.define(
         'thumbor.filters.max_age',
         'thumbor.filters.curve',
         'thumbor.filters.distributed_collage',
+        'thumbor.filters.background_color',
     ],
     'List of filters that thumbor will allow to be used in generated images. All of them must be ' +
     'full names of python modules (python must be able to import it)', 'Filters')

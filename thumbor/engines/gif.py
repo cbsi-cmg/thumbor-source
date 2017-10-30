@@ -31,8 +31,11 @@ class Engine(PILEngine):
 
     def run_gifsicle(self, command):
         p = Popen([self.context.server.gifsicle_path] + command.split(' '), stdout=PIPE, stdin=PIPE, stderr=PIPE)
-        stdout_data = p.communicate(input=self.buffer)[0]
+        stdout_data, stderr_data = p.communicate(input=self.buffer)
         if p.returncode != 0:
+            logger.error(stderr_data)
+
+        if stdout_data is None:
             raise GifSicleError(
                 'gifsicle command returned errorlevel {0} for command "{1}" (image maybe corrupted?)'.format(
                     p.returncode, ' '.join(
@@ -42,6 +45,7 @@ class Engine(PILEngine):
                     )
                 )
             )
+
         return stdout_data
 
     def is_multiple(self):
@@ -118,8 +122,8 @@ class Engine(PILEngine):
 
         # Make sure gifsicle produced a valid gif.
         try:
-            with Image.open(BytesIO(self.buffer)) as image:
-                image.verify()
+            with BytesIO(self.buffer) as buff:
+                Image.open(buff).verify()
         except Exception:
             self.context.metrics.incr('gif_engine.no_output')
             logger.error("[GIF_ENGINE] invalid gif engine result for url `{url}`.".format(
@@ -131,3 +135,7 @@ class Engine(PILEngine):
 
     def convert_to_grayscale(self):
         self.operations.append('--use-colormap gray')
+
+    # gif have no exif data and thus can't be auto oriented
+    def reorientate(self, override_exif=True):
+        pass

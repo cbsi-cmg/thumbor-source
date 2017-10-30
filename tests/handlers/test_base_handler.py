@@ -27,6 +27,7 @@ from thumbor.config import Config
 from thumbor.importer import Importer
 from thumbor.context import Context, ServerParameters, RequestParameters
 from thumbor.handlers import FetchResult, BaseHandler
+from thumbor.result_storages.file_storage import Storage as FileResultStorage
 from thumbor.storages.file_storage import Storage as FileStorage
 from thumbor.storages.no_storage import Storage as NoStorage
 from thumbor.utils import which
@@ -169,6 +170,17 @@ class ImagingOperationsWithHttpLoaderTestCase(BaseImagingTestCase):
         response = self.fetch(url)
         expect(response.code).to_equal(200)
 
+    def test_image_with_http_utf8_url(self):
+        with open('./tests/fixtures/images/maracujá.jpg', 'r') as f:
+            self.context.modules.storage.put(
+                quote(u"http://test.com/maracujá.jpg".encode('utf-8')),
+                f.read()
+            )
+
+        url = quote(u"/unsafe/http://test.com/maracujá.jpg".encode('utf-8'))
+        response = self.fetch(url)
+        expect(response.code).to_equal(200)
+
 
 class ImagingOperationsTestCase(BaseImagingTestCase):
     def get_context(self):
@@ -245,6 +257,10 @@ class ImagingOperationsTestCase(BaseImagingTestCase):
 
     def test_getting_invalid_image_returns_bad_request(self):
         response = self.fetch('/unsafe/image_invalid.jpg')
+        expect(response.code).to_equal(400)
+
+    def test_getting_invalid_watermark_returns_bad_request(self):
+        response = self.fetch('/unsafe/filters:watermark(boom.jpg,0,0,0)/image.jpg')
         expect(response.code).to_equal(400)
 
     def test_can_read_monochromatic_jpeg(self):
@@ -424,32 +440,54 @@ class ImageOperationsWithAutoWebPTestCase(BaseImagingTestCase):
         response = self.get_as_webp('/unsafe/0x0:1681x596/1x/image.jpg')
 
         expect(response.code).to_equal(200)
+        expect(response.headers).to_include('Vary')
+        expect(response.headers['Vary']).to_include('Accept')
         expect(response.body).to_be_webp()
 
     def test_should_convert_monochromatic_jpeg(self):
         response = self.get_as_webp('/unsafe/grayscale.jpg')
         expect(response.code).to_equal(200)
+        expect(response.headers).to_include('Vary')
+        expect(response.headers['Vary']).to_include('Accept')
         expect(response.body).to_be_webp()
 
     def test_should_convert_cmyk_jpeg(self):
         response = self.get_as_webp('/unsafe/cmyk.jpg')
         expect(response.code).to_equal(200)
+        expect(response.headers).to_include('Vary')
+        expect(response.headers['Vary']).to_include('Accept')
         expect(response.body).to_be_webp()
 
     def test_shouldnt_convert_cmyk_jpeg_if_format_specified(self):
         response = self.get_as_webp('/unsafe/filters:format(png)/cmyk.jpg')
         expect(response.code).to_equal(200)
+        expect(response.headers).not_to_include('Vary')
         expect(response.body).to_be_png()
 
     def test_shouldnt_convert_cmyk_jpeg_if_gif(self):
         response = self.get_as_webp('/unsafe/filters:format(gif)/cmyk.jpg')
         expect(response.code).to_equal(200)
+        expect(response.headers).not_to_include('Vary')
         expect(response.body).to_be_gif()
 
-    def test_shouldnt_convert_cmyk_if_format_specified(self):
+    def test_shouldnt_convert_if_format_specified(self):
         response = self.get_as_webp('/unsafe/filters:format(gif)/image.jpg')
         expect(response.code).to_equal(200)
+        expect(response.headers).not_to_include('Vary')
         expect(response.body).to_be_gif()
+
+    def test_shouldnt_add_vary_if_format_specified(self):
+        response = self.get_as_webp('/unsafe/filters:format(webp)/image.jpg')
+        expect(response.code).to_equal(200)
+        expect(response.headers).not_to_include('Vary')
+        expect(response.body).to_be_webp()
+
+    def test_should_add_vary_if_format_invalid(self):
+        response = self.get_as_webp('/unsafe/filters:format(asdf)/image.jpg')
+        expect(response.code).to_equal(200)
+        expect(response.headers).to_include('Vary')
+        expect(response.headers['Vary']).to_include('Accept')
+        expect(response.body).to_be_webp()
 
     def test_converting_return_etags(self):
         response = self.get_as_webp('/unsafe/image.jpg')
@@ -501,7 +539,6 @@ class ImageOperationsWithAutoWebPWithResultStorageTestCase(BaseImagingTestCase):
         expect(response.headers).to_include('Vary')
         expect(response.headers['Vary']).to_include('Accept')
         expect(response.body).to_be_webp()
-        expect(self.context.request.engine.extension).to_equal('.webp')
 
     @patch('thumbor.handlers.Context')
     def test_can_auto_convert_unsafe_jpeg_from_result_storage(self, context_mock):
@@ -628,6 +665,14 @@ class ImageOperationsWithGifVTestCase(BaseImagingTestCase):
         expect(response.code).to_equal(200)
         expect(response.headers['Content-Type']).to_equal('video/webm')
 
+    def test_should_convert_animated_gif_to_video_and_force_even_dimensions(self):
+        response = self.fetch('/unsafe/meta/51x51/filters:gifv()/animated.gif')
+
+        expect(response.code).to_equal(200)
+        obj = loads(response.body)
+        expect(obj['thumbor']['target']['width']).to_equal(50)
+        expect(obj['thumbor']['target']['height']).to_equal(50)
+
 
 class ImageOperationsImageCoverTestCase(BaseImagingTestCase):
     def get_context(self):
@@ -738,6 +783,12 @@ class ImageOperationsResultStorageOnlyTestCase(BaseImagingTestCase):
         response = self.fetch('/gTr2Xr9lbzIa2CT_dL_O0GByeR0=/animated.gif')
         expect(response.code).to_equal(200)
         expect(response.body).to_be_similar_to(animated_image())
+
+    @patch.object(FileResultStorage, 'get', side_effect=Exception)
+    def test_loads_image_from_result_storage_fails_on_exception(self, get_mock_1):
+        response = self.fetch('/gTr2Xr9lbzIa2CT_dL_O0GByeR0=/animated.gif')
+        expect(response.code).to_equal(500)
+        expect(response.body).to_be_empty()
 
 
 class ImageOperationsWithGifWithoutGifsicle(BaseImagingTestCase):
@@ -913,6 +964,11 @@ class EngineLoadException(BaseImagingTestCase):
     def test_should_exec_other_operations_on_error_on_engine_exception(self):
         response = self.fetch('/unsafe/fit-in/134x134/filters:equalize()/940x2.png')
         expect(response.code).to_equal(200)
+
+    @patch.object(Engine, 'read', side_effect=Exception)
+    def test_should_fail_with_500_upon_engine_read_exception(self, read_mock):
+        response = self.fetch('/unsafe/fit-in/134x134/940x2.png')
+        expect(response.code).to_equal(500)
 
 
 class StorageOverride(BaseImagingTestCase):

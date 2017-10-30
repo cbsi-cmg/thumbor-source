@@ -12,7 +12,7 @@ import datetime
 import re
 from functools import partial
 from urlparse import urlparse
-from urllib2 import unquote
+from urllib2 import unquote, quote
 
 import tornado.httpclient
 
@@ -21,8 +21,15 @@ from thumbor.utils import logger
 from tornado.concurrent import return_future
 
 
+def encode_url(url):
+    if url == unquote(url):
+        return quote(url.encode('utf-8'), safe='~@#$&()*!+=:;,.?/\'')
+    else:
+        return url
+
+
 def quote_url(url):
-    return unquote(url).decode('utf-8')
+    return encode_url(unquote(url).decode('utf-8'))
 
 
 def _normalize_url(url):
@@ -122,7 +129,8 @@ def load_sync(context, url, callback, normalize_url_func):
         proxy_password=encode(context.config.HTTP_LOADER_PROXY_PASSWORD),
         ca_certs=encode(context.config.HTTP_LOADER_CA_CERTS),
         client_key=encode(context.config.HTTP_LOADER_CLIENT_KEY),
-        client_cert=encode(context.config.HTTP_LOADER_CLIENT_CERT)
+        client_cert=encode(context.config.HTTP_LOADER_CLIENT_CERT),
+        validate_cert=context.config.HTTP_LOADER_VALIDATE_CERTS
     )
 
     start = datetime.datetime.now()

@@ -13,9 +13,9 @@ import tornado
 from concurrent.futures import ThreadPoolExecutor, Future
 import functools
 
-from thumbor.utils import logger
 from thumbor.filters import FiltersFactory
 from thumbor.metrics.logger_metrics import Metrics
+from thumbor.utils import logger
 
 
 class Context:
@@ -263,13 +263,15 @@ class ThreadPool(object):
     def _execute_in_foreground(self, operation, callback):
         result = Future()
         returned = None
+
         try:
             returned = operation()
         except Exception as e:
-            # just log exception and release ioloop
-            returned = e
-            logger.exception(e)
-        result.set_result(returned)
+            logger.exception('[ThreadPool] %s', e)
+            result.set_exception(e)
+        else:
+            result.set_result(returned)
+
         callback(result)
 
     def _execute_in_pool(self, operation, callback):

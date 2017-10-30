@@ -55,6 +55,14 @@ class Transformer(object):
             else:
                 self.target_height = self.engine.get_proportional_height(self.context.request.width)
 
+        # For gifv requests, videos can only have even number dimensions so we enforce that here.
+        # When this ffmpeg bug is fixed: https://trac.ffmpeg.org/ticket/6294
+        # we can remove this work around and restore the scale filter
+        # to the original ffmpeg command options => '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+        if 'gifv' in self.context.request.filters:
+            self.target_width = (self.target_width // 2) * 2
+            self.target_height = (self.target_height // 2) * 2
+
     def get_target_dimensions(self):
         """
         Returns the target dimensions and calculates them if necessary.
@@ -131,6 +139,7 @@ class Transformer(object):
     def smart_storage_key(self):
         return self.context.request.image_url
 
+    @gen.coroutine
     def smart_detect(self):
         is_gifsicle = (self.context.request.engine.extension == '.gif' and self.context.config.USE_GIFSICLE_ENGINE)
         if (not (self.context.modules.detectors and self.context.request.smart)) or is_gifsicle:
@@ -148,7 +157,7 @@ class Transformer(object):
             # image operation inside the try block.
             self.should_run_image_operations = False
             self.running_smart_detection = True
-            self.do_smart_detection().result()
+            yield self.do_smart_detection()
             self.running_smart_detection = False
         except Exception:
             if not self.context.config.IGNORE_SMART_ERRORS:
