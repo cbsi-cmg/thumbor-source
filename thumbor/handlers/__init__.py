@@ -14,6 +14,7 @@ import datetime
 import re
 import pytz
 import traceback
+import schedule
 
 import tornado.web
 import tornado.gen as gen
@@ -33,6 +34,11 @@ import thumbor.filters
 
 
 HTTP_DATE_FMT = "%a, %d %b %Y %H:%M:%S GMT"
+
+try:
+    basestring        # Python 2
+except NameError:
+    basestring = str  # Python 3
 
 
 class FetchResult(object):
@@ -149,6 +155,9 @@ class BaseHandler(tornado.web.RequestHandler):
                 elif result.loader_error == LoaderResult.ERROR_TIMEOUT:
                     # Return a Gateway Timeout status if upstream timed out (i.e. 599)
                     self._error(504)
+                    return
+                elif isinstance(result.loader_error, int):
+                    self._error(result.loader_error)
                     return
                 elif hasattr(result, 'engine_error') and result.engine_error == EngineResult.COULD_NOT_LOAD_IMAGE:
                     self._error(400)
@@ -280,11 +289,11 @@ class BaseHandler(tornado.web.RequestHandler):
             else:
                 return False
             while True:
-                l = ord(data[i])
+                j = ord(data[i])
                 i += 1
-                if not l:
+                if not j:
                     break
-                i += l
+                i += j
         return frames > 1
 
     def define_image_type(self, context, result):
@@ -395,6 +404,8 @@ class BaseHandler(tornado.web.RequestHandler):
             if should_store:
                 self._store_results(context, results)
 
+            schedule.run_pending()
+
         self.context.thread_pool.queue(
             operation=functools.partial(self._load_results, context),
             callback=inner,
@@ -427,8 +438,8 @@ class BaseHandler(tornado.web.RequestHandler):
         should_vary = should_vary and content_type.startswith("image/")
         # output format is not requested via format filter
         should_vary = should_vary and not (
-            context.request.format  # format is supported by filter
-            and bool(re.search(r"format\([^)]+\)", context.request.filters))  # filter is in request
+            context.request.format and  # format is supported by filter
+            bool(re.search(r"format\([^)]+\)", context.request.filters))  # filter is in request
         )
         # our image is not animated gif
         should_vary = should_vary and not self.is_animated_gif(buffer)
@@ -591,9 +602,6 @@ class BaseHandler(tornado.web.RequestHandler):
 
         self.context.request.extension = extension = EXTENSION.get(mime, '.jpg')
 
-        original_preserve = self.context.config.PRESERVE_EXIF_INFO
-        self.context.config.PRESERVE_EXIF_INFO = True
-
         try:
             if mime == 'image/gif' and self.context.config.USE_GIFSICLE_ENGINE:
                 self.context.request.engine = self.context.modules.gif_engine
@@ -620,14 +628,12 @@ class BaseHandler(tornado.web.RequestHandler):
             is_mixed_no_file_storage = is_mixed_storage and isinstance(storage.file_storage, NoStorage)
 
             if not (is_no_storage or is_mixed_no_file_storage):
-                fetch_result.buffer = self.context.request.engine.read(extension)
                 storage.put(url, fetch_result.buffer)
 
             storage.put_crypto(url)
         except Exception:
             fetch_result.successful = False
         finally:
-            self.context.config.PRESERVE_EXIF_INFO = original_preserve
             if not fetch_result.successful:
                 raise
             fetch_result.buffer = None

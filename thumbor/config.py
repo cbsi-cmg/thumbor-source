@@ -16,6 +16,11 @@ from derpconf.config import Config
 
 from thumbor import __version__
 
+try:
+    basestring        # Python 2
+except NameError:
+    basestring = str  # Python 3
+
 home = expanduser("~")
 
 Config.define('THUMBOR_LOG_CONFIG', None, 'Logging configuration as json', 'Logging')
@@ -131,6 +136,7 @@ Config.define('ALLOW_UNSAFE_URL', True, 'Indicates if the /unsafe URL should be 
 Config.define('ALLOW_OLD_URLS', True, 'Indicates if encrypted (old style) URLs should be allowed', 'Security')
 Config.define('ENABLE_ETAGS', True, 'Enables automatically generated etags', 'HTTP')
 Config.define('MAX_ID_LENGTH', 32, 'Set maximum id length for images when stored', 'Storage')
+Config.define('GC_INTERVAL', None, 'Set garbage collection interval in seconds', 'Performance')
 
 # METRICS OPTIONS
 Config.define('STATSD_HOST', None, 'Host to send statsd instrumentation to', 'Metrics')
@@ -159,6 +165,12 @@ Config.define(
 Config.define(
     'HTTP_LOADER_FORWARD_USER_AGENT', False,
     'Indicates whether thumbor should forward the user agent of the requesting user', 'HTTP Loader')
+Config.define(
+    'HTTP_LOADER_FORWARD_ALL_HEADERS', False,
+    'Indicates whether thumbor should forward the headers of the request', 'HTTP Loader')
+Config.define(
+    'HTTP_LOADER_FORWARD_HEADERS_WHITELIST', [],
+    'Indicates which headers should be forwarded among all the headers of the request', 'HTTP Loader')
 Config.define(
     'HTTP_LOADER_DEFAULT_USER_AGENT', "Thumbor/%s" % __version__,
     'Default user agent for thumbor http loader requests', 'HTTP Loader')
@@ -189,6 +201,16 @@ Config.define(
 Config.define(
     'HTTP_LOADER_CURL_ASYNC_HTTP_CLIENT', False,
     'If the CurlAsyncHTTPClient should be used', 'HTTP Loader')
+Config.define(
+    'HTTP_LOADER_CURL_LOW_SPEED_TIME', 0,
+    'If HTTP_LOADER_CURL_LOW_SPEED_LIMIT and HTTP_LOADER_CURL_ASYNC_HTTP_CLIENT ' +
+    'are set, then this is the time in seconds as integer after a download should ' +
+    'timeout if the speed is below HTTP_LOADER_CURL_LOW_SPEED_LIMIT for that long')
+Config.define(
+    'HTTP_LOADER_CURL_LOW_SPEED_LIMIT', 0,
+    'If HTTP_LOADER_CURL_LOW_SPEED_TIME and HTTP_LOADER_CURL_ASYNC_HTTP_CLIENT ' +
+    'are set, then this is the limit in bytes per second as integer which should ' +
+    'timeout if the speed is below that limit for HTTP_LOADER_CURL_LOW_SPEED_TIME seconds')
 
 # FILE STORAGE GENERIC OPTIONS
 Config.define(
@@ -297,6 +319,7 @@ Config.define(
         'thumbor.filters.equalize',
         'thumbor.filters.fill',
         'thumbor.filters.sharpen',
+        'thumbor.filters.strip_exif',
         'thumbor.filters.strip_icc',
         'thumbor.filters.frame',
         'thumbor.filters.grayscale',
@@ -311,8 +334,8 @@ Config.define(
         'thumbor.filters.saturation',
         'thumbor.filters.max_age',
         'thumbor.filters.curve',
-        'thumbor.filters.distributed_collage',
         'thumbor.filters.background_color',
+        'thumbor.filters.upscale',
     ],
     'List of filters that thumbor will allow to be used in generated images. All of them must be ' +
     'full names of python modules (python must be able to import it)', 'Filters')
