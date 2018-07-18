@@ -8,11 +8,9 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
-import gc
 import sys
 import logging
 import logging.config
-import schedule
 import warnings
 
 import os
@@ -43,7 +41,10 @@ def get_as_integer(value):
         return None
 
 
-def get_config(config_path):
+def get_config(config_path, use_environment=False):
+    if use_environment:
+        Config.allow_environment_variables()
+
     lookup_paths = [os.curdir,
                     expanduser('~'),
                     '/etc/',
@@ -126,19 +127,13 @@ def run_server(application, context):
     server.start(1)
 
 
-def gc_collect():
-    collected = gc.collect()
-    if collected > 0:
-        logging.warn('Garbage collector: collected %d objects.' % collected)
-
-
 def main(arguments=None):
     '''Runs thumbor server with the specified arguments.'''
     if arguments is None:
         arguments = sys.argv[1:]
 
     server_parameters = get_server_parameters(arguments)
-    config = get_config(server_parameters.config_path)
+    config = get_config(server_parameters.config_path, server_parameters.use_environment)
     configure_log(config, server_parameters.log_level.upper())
 
     validate_config(config, server_parameters)
@@ -149,9 +144,6 @@ def main(arguments=None):
         application = get_application(context)
         run_server(application, context)
 
-        if (config.GC_INTERVAL and config.GC_INTERVAL > 0):
-            schedule.every(config.GC_INTERVAL).seconds.do(gc_collect)
-
         try:
             logging.debug('thumbor running at %s:%d' % (context.server.ip, context.server.port))
             tornado.ioloop.IOLoop.instance().start()
@@ -161,4 +153,4 @@ def main(arguments=None):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])
